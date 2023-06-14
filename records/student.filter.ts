@@ -1,9 +1,9 @@
 import { pool } from '../config/db';
-import { AvailableStudent, FilterQuery } from '../types';
+import { AvailableStudent, expectedContractType, expectedTypeWork, FilterQuery, Internship } from '../types';
 
 export class StudentFilter implements FilterQuery{
-    remoteWork: boolean|string;
-    inOffice: boolean|string;
+    remoteWork: boolean;
+    inOffice: boolean;
     employmentContract: boolean|string;
     b2b: boolean|string;
     mandateContract: boolean|string;
@@ -18,7 +18,8 @@ export class StudentFilter implements FilterQuery{
     teamProjectDegree: string|number;
     page: string|number;
     rowsPerPage : string|number;
-    hrId?: string;
+    hrId: string;
+    action:string;
 
     constructor(obj:FilterQuery) {
         //@TODO data validation can be added
@@ -39,144 +40,146 @@ export class StudentFilter implements FilterQuery{
         this.page = obj.page;
         this.rowsPerPage = obj.rowsPerPage;
         this.hrId=obj.hrId;
+        this.action = obj.action;
+    }
+
+    expectedTypeWork() {
+        if (this.remoteWork || this.inOffice )
+            return [
+                (this.remoteWork ? expectedTypeWork.remoteWork : expectedTypeWork.none),
+                (this.inOffice ? expectedTypeWork.inOffice : expectedTypeWork.none)
+            ]
+        else
+            return [
+                expectedTypeWork.remoteWork,
+                expectedTypeWork.inOffice
+            ]
+    }
+
+    expectedContractType(){
+        if(this.employmentContract || this.b2b || this.mandateContract || this.workContract){
+            return [
+                this.employmentContract ? expectedContractType.employmentContract : expectedContractType.none,
+                this.b2b ? expectedContractType.b2b : expectedContractType.none,
+                this.mandateContract ? expectedContractType.mandateContract : expectedContractType.none,
+                this.workContract ? expectedContractType.workContract : expectedContractType.none
+            ]
+        }else{
+            return [
+                expectedContractType.employmentContract,
+                expectedContractType.b2b,
+                expectedContractType.mandateContract,
+                expectedContractType.workContract
+            ]
+        }
+    }
+
+    apprenticeship(){
+        if(this.canTakeApprenticeship === null){
+            return [Internship.Nie, Internship.Tak]
+        }else{
+            return [this.canTakeApprenticeship ? Internship.Tak : Internship.Nie]
+        }
     }
 
     change(){
-        let query = '';
-        if(this.remoteWork === 'true' || this.inOffice === 'true'){
-            query +=  '`expectedTypeWork` IN (:remoteWork, :inOffice)';
-        }
-        if(this.employmentContract === true || this.b2b === true || this.mandateContract === true || this.workContract === true){
-            if(query !== ''){
-                query += ' AND ';
-            }
-            query += '`expectedContractType` IN (:employmentContract, :b2b,:mandateContract,:workContract)'
-        }
-        if(this.canTakeApprenticeship !== 'null'){
-            if(query !== ''){
-                query += ' AND ';
-            }
-            query += '`canTakeApprenticeship` = :canTakeApprenticeship'
-        }
-        if(query !== ''){
-            query += ' AND ';
-        }
-        this.remoteWork = this.remoteWork === 'true' ? '2' : '9';
-        this.inOffice = this.inOffice === 'true' ? '1' : '9';
-        this.employmentContract = this.employmentContract === 'true' ? '1' : '9';
-        this.b2b = this.b2b === 'true' ? '2' : '9';
-        this.mandateContract = this.mandateContract === 'true' ? '3' : '9';
-        this.workContract = this.workContract === 'true' ? '4' : '9';
         this.page = Number(this.page);
         this.rowsPerPage = Number(this.rowsPerPage);
         this.page = this.page * this.rowsPerPage;
-        return query;
+
+        const selectAll= [
+            'studentId',
+            'firstName',
+            'lastName',
+            'courseCompletion',
+            'courseEngagement',
+            'projectDegree',
+            'teamProjectDegree',
+            'expectedTypeWork',
+            'targetWorkCity',
+            'expectedContractType',
+            'expectedSalary',
+            'canTakeApprenticeship',
+            'monthsOfCommercialExp'
+        ];
+
+        const selectReserved =[
+            'studentId',
+            'firstName',
+            'lastName',
+            'courseCompletion',
+            'courseEngagement',
+            'projectDegree',
+            'teamProjectDegree',
+            'expectedTypeWork',
+            'targetWorkCity',
+            'expectedContractType',
+            'expectedSalary',
+            'canTakeApprenticeship',
+            'monthsOfCommercialExp',
+            'githubUsername',
+            'reservationExpiresOn'
+        ];
+
+        if(this.action === 'all')
+            return{
+                select: selectAll,
+                userStatus: 1,
+                reservedBy: null,
+            }
+        else if(this.action === 'reserved')
+        {
+            return{
+                select: selectReserved,
+                userStatus: 2,
+                reservedBy: this.hrId,
+            }
+        }
+
     }
 
-    async get():Promise<AvailableStudent[] | null>{
-        const query = this.change();
+    async getStudents():Promise<AvailableStudent[] | null>{
+        const { select,userStatus,reservedBy } = this.change();
         const results = await pool('students')
-            .select(
-                'studentId',
-                'firstName',
-                'lastName',
-                'courseCompletion',
-                'courseEngagement',
-                'projectDegree',
-                'teamProjectDegree',
-                'expectedTypeWork',
-                'targetWorkCity',
-                'expectedContractType',
-                'expectedSalary',
-                'canTakeApprenticeship',
-                'monthsOfCommercialExp'
-            )
-            .whereRaw(query)
-            .where('expectedSalary', '>=', this.min)
-            .where('expectedSalary', '<=', this.max)
+            .select(select)
+            .whereIn('expectedTypeWork', this.expectedTypeWork() )
+            .whereIn('expectedContractType', this.expectedContractType())
+            .whereIn('canTakeApprenticeship', this.apprenticeship())
+            .whereBetween('expectedSalary',[this.min,this.max])
             .where('monthsOfCommercialExp', '>=', this.monthsOfCommercialExp)
             .where('courseCompletion', '>=', this.courseCompletion)
             .where('courseEngagement', '>=', this.courseEngagement)
             .where('projectDegree', '>=', this.projectDegree)
             .where('teamProjectDegree', '>=', this.teamProjectDegree)
-            .where('userStatus', '1')
+            .where('userStatus', userStatus)
+            .where('reservedBy', reservedBy)
             .limit(Number(this.rowsPerPage))
             .offset(Number(this.page)) as AvailableStudent[];
-        
+
         return results.length === 0 ? null : results;
     }
 
-    async allRecordsStudent():Promise<any>{
-        const query = this.change();
+    async allRecordsStudent():Promise<number>{
+
+        const { userStatus,reservedBy } = this.change();
         const results = await pool('students')
             .count('* as totalCount')
-            .whereRaw(query)
-            .where('expectedSalary', '>=', this.min)
-            .where('expectedSalary', '<=', this.max)
+            .whereIn('expectedTypeWork', this.expectedTypeWork() )
+            .whereIn('expectedContractType', this.expectedTypeWork())
+            .whereIn('canTakeApprenticeship', this.apprenticeship())
+            .whereBetween('expectedSalary',[this.min,this.max])
             .where('monthsOfCommercialExp', '>=', this.monthsOfCommercialExp)
             .where('courseCompletion', '>=', this.courseCompletion)
             .where('courseEngagement', '>=', this.courseEngagement)
             .where('projectDegree', '>=', this.projectDegree)
             .where('teamProjectDegree', '>=', this.teamProjectDegree)
-            .where('userStatus', '1')
+            .where('userStatus', userStatus)
+            .where('reservedBy', reservedBy)
             .first() as { totalCount:number };
 
         return results.totalCount;
     }
-
-    async getReserved():Promise<AvailableStudent[] | null>{
-        const query = this.change();
-        const results = await pool('students')
-            .select(
-                'studentId',
-                'firstName',
-                'lastName',
-                'courseCompletion',
-                'courseEngagement',
-                'projectDegree',
-                'teamProjectDegree',
-                'expectedTypeWork',
-                'targetWorkCity',
-                'expectedContractType',
-                'expectedSalary',
-                'canTakeApprenticeship',
-                'monthsOfCommercialExp',
-                'githubUsername',
-                'reservationExpiresOn'
-            )
-            .whereRaw(query)
-            .where('expectedSalary', '>=', this.min)
-            .where('expectedSalary', '<=', this.max)
-            .where('monthsOfCommercialExp', '>=', this.monthsOfCommercialExp)
-            .where('courseCompletion', '>=', this.courseCompletion)
-            .where('courseEngagement', '>=', this.courseEngagement)
-            .where('projectDegree', '>=', this.projectDegree)
-            .where('teamProjectDegree', '>=', this.teamProjectDegree)
-            .where('reservedBy', this.hrId)
-            .where('userStatus', '2')
-            .limit(Number(this.rowsPerPage))
-            .offset(Number(this.page)) as AvailableStudent[];
-
-        return results.length === 0 ? null : results;
-    }
-    async allRecordsReservedStudent():Promise<any>{
-        const query = this.change();
-        const results = await pool('students')
-            .count('* as totalCount')
-            .whereRaw(query)
-            .where('expectedSalary', '>=', this.min)
-            .where('expectedSalary', '<=', this.max)
-            .where('monthsOfCommercialExp', '>=', this.monthsOfCommercialExp)
-            .where('courseCompletion', '>=', this.courseCompletion)
-            .where('courseEngagement', '>=', this.courseEngagement)
-            .where('projectDegree', '>=', this.projectDegree)
-            .where('teamProjectDegree', '>=', this.teamProjectDegree)
-            .where('reservedBy', this.hrId)
-            .where('userStatus', '2')
-            .first() as { totalCount:number };
-
-        return Number(results.totalCount);
-    }
+   
 }
 
 // console.log(
