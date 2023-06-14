@@ -9,6 +9,19 @@ export enum ContractType {
   'Umowa zlecenie',
   'Umowa o dzieło',
 }
+export enum expectedTypeWork{
+  none,
+  inOffice,
+  remoteWork,
+}
+
+export enum expectedContractType{
+  none,
+  employmentContract,
+  b2b,
+  mandateContract,
+  workContract,
+}
 
 export enum Internship {
   Nie,
