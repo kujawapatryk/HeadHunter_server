@@ -1,6 +1,6 @@
 export interface FilterQuery {
-  remoteWork: boolean|string,
-  inOffice: boolean|string,
+  remoteWork: boolean,
+  inOffice: boolean,
   employmentContract: boolean|string,
   b2b: boolean|string,
   mandateContract: boolean|string,
@@ -15,7 +15,9 @@ export interface FilterQuery {
   teamProjectDegree: string|number,
   page: string|number,
   rowsPerPage : string|number,
-  hrId?:string|null,
+  hrId:string|null,
+  action: string
+
 }
 
 export interface FilterCon {
