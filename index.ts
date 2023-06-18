@@ -19,7 +19,6 @@ app.use(
 );
 
 app.use(json());
-app.use(handleError);
 
 app.use('/user', userRouter);
 app.use('/student', studentRouter);
@@ -27,7 +26,7 @@ app.use('/hr', hrRouter);
 app.use('/manage', adminRouter);
 app.use('/', homeRouter);
 app.use('/auth', authRouter)
-
+app.use(handleError);
 app.listen(3001, 'localhost', () => {
     console.log('Listening on http://localhost:3001');
 });
