@@ -16,7 +16,7 @@ export class HrRecord implements HrEntity {
             throw new ValidationError('HR musi posiadać imię i nazwisko');
         }
         if (!obj.company) {
-            throw new ValidationError('Firma HR musi być podana');
+            throw new ValidationError('Nazwa organizacji musi być podana');
         }
         if (obj.maxReservedStudents < 1 || obj.maxReservedStudents > 999) {
             throw new ValidationError('HR musi mieć ustalony limit w zakresie 1-999');
@@ -35,8 +35,6 @@ export class HrRecord implements HrEntity {
                 fullName: this.fullName,
                 company: this.company,
                 maxReservedStudents: this.maxReservedStudents,
-            }).then(() => {
-                console.log('Użytkownik HR został dodany');
             }).catch(() => {
                 throw new ValidationError('Dodanie użytkownika HR zakończone niepowodzeniem.')
             });

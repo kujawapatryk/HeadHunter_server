@@ -27,7 +27,7 @@ export class UserRecord implements  UserEntity {
         this.userState = obj.userState;
     }
     async insert():Promise<void>{
-        this.password = null;
+        this.password = '';
         this.authToken = null;
         this.userState = 0;
 
@@ -37,8 +37,6 @@ export class UserRecord implements  UserEntity {
             password: this.password,
             authToken: this.authToken,
             userState: this.userState
-        }).then(() => {
-            console.log('Użytkownik został dodany');
         }).catch(() => {
             throw new ValidationError('Dodanie użytkownika zakończone niepowodzeniem.')
         });
@@ -86,9 +84,6 @@ export class UserRecord implements  UserEntity {
                         state: user.userState
                     }
 
-                }
-                else{
-                    throw new ValidationError('Dane logowanie są niepoprawne.');
                 }
             } catch (err) {
                 console.error(err.message);
