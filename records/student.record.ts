@@ -201,25 +201,25 @@ export class StudentRecord implements StudentEntity {
               .where('userStatus', 2)
               .first() as string;
 
-          // const [results] = await pool.execute('SELECT `studentId` FROM `students` WHERE `studentId`=:studentId AND `userStatus`= 2',{ studentId } ) as unknown as StatusResult;
-          if(results === null) throw new ValidationError('Student został już zarezerwowany');
+          if(results === null) throw new ValidationError('bookedUp');
           const now = new Date();
           reservationExpiresOn = new Date(now.getTime() + 10 * 24 * 60 * 60 * 1000);
           userStatus = UpdateAction.reserve;
-          message= 'Kursant został zarezerwowany';
+          message= 'reserve';
       } else if (action === UpdateAction.employ) {
           reservationExpiresOn = null;
           userStatus = UpdateAction.employ;
-          message= 'Kursant został zatrudniony';
+          message= 'employ';
           await sendMail('headhunter@testHeadHunter.oi','student o id:'+studentId+' został zatrudniony','student o id:'+studentId+' został zatrudniony') //@TODO to consider what text should be sent
       } else if (action === UpdateAction.disinterest){
           reservationExpiresOn = null;
           userStatus = UpdateAction.disinterest;
           hrId=null;
-          message= 'Zgłoszono brak zainteresowania kursantem'
+          message= 'disinterest';
+
       }
       else{
-          throw new ValidationError('Nie udało się wykonać zmiany statusu');
+          throw new ValidationError('statusChangeFailed');
       }
 
       const results = await pool('students')
@@ -233,7 +233,7 @@ export class StudentRecord implements StudentEntity {
       if (results) {
           return message;
       } else {
-          throw new ValidationError('Nie udało się wykonać zmiany statusu');
+          throw new ValidationError('statusChangeFailed');
       }
   }
 
