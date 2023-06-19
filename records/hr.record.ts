@@ -13,13 +13,13 @@ export class HrRecord implements HrEntity {
     constructor(obj: HrEntity) {
     
         if (!obj.fullName) {
-            throw new ValidationError('HR musi posiadać imię i nazwisko');
+            throw new ValidationError('nameRequired');
         }
         if (!obj.company) {
-            throw new ValidationError('Nazwa organizacji musi być podana');
+            throw new ValidationError('organizationNameRequired');
         }
         if (obj.maxReservedStudents < 1 || obj.maxReservedStudents > 999) {
-            throw new ValidationError('HR musi mieć ustalony limit w zakresie 1-999');
+            throw new ValidationError('hrLimit');
         }
 
         this.hrId = obj.hrId;
@@ -36,7 +36,7 @@ export class HrRecord implements HrEntity {
                 company: this.company,
                 maxReservedStudents: this.maxReservedStudents,
             }).catch(() => {
-                throw new ValidationError('Dodanie użytkownika HR zakończone niepowodzeniem.')
+                throw new ValidationError('userAddFailed')
             });
 
     }
