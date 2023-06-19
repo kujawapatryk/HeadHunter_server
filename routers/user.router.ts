@@ -2,7 +2,7 @@ import { Request, Response, Router } from 'express';
 import { UserRecord } from '../records/user.record';
 import { ValidationError } from '../utils/errors';
 import { hash } from 'bcrypt';
-import jwt from 'jsonwebtoken';
+//import jwt from 'jsonwebtoken';
 
 export const userRouter = Router();
 
@@ -12,7 +12,6 @@ userRouter
         const params = new UserRecord(req.body);
         const response = await params.checkPassword();
         if (response.id) {
-            console.log('Dane logowania są prawidłowe');
             res.json(response);
             // const token = jwt.sign({ email: newParams.email }, /* @todo SET SECRET KEY process.env.secret_key*/'SEKRET', { expiresIn: '24h' });
             // res.json({ token });
@@ -21,13 +20,13 @@ userRouter
         }
 
     })
-    .post('/refresh', async (req, res) => {
-        // refresh jwt
-    })
-
-    .delete('/logout', async (req, res) => {
-        // czyszczenie tokenów i wylogowanie
-    })
+    // .post('/refresh', async (req, res) => {
+    //     // refresh jwt
+    // })
+    //
+    // .delete('/logout', async (req, res) => {
+    //     // czyszczenie tokenów i wylogowanie
+    // })
 
     .post('/my-status', async (req, res) => {
         const { studentId, userStatus } = req.body;
@@ -61,10 +60,10 @@ userRouter
         const passwordRegex = /^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&*])(?=.{8,})/;
 
         if (!passwordRegex.test(pass)) {
-            throw new ValidationError('Hasło musi mieć co najmniej 8 znaków, składać się z dużych i małych liter, cyfr i znaków specjalnych');
+            throw new ValidationError('invalidPasswordFormat');
         }
         if (pass !== pass2) {
-            throw new ValidationError('Hasła są różne');
+            throw new ValidationError('mismatchedPasswords');
         }
         const hashPassword = await hash(pass, 10);
         await UserRecord.updatePassword(id, hashPassword);
@@ -76,11 +75,11 @@ userRouter
         const isEmail = await UserRecord.checkEmail(email);
 
         if(isEmail!==null){
-            throw new ValidationError('Taki e-mail już istnieje w systemie')
+            throw new ValidationError('emailExists')
         }
 
         if (!email.includes('@')) {
-            throw new ValidationError('To nie jest poprawny adres e-mail');
+            throw new ValidationError('invalidEmail');
         }
         await UserRecord.updateEmail(id, email);
         res.json(true);

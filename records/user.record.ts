@@ -16,9 +16,9 @@ export class UserRecord implements  UserEntity {
         const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
         if (!obj.email) {
-            throw new ValidationError('Adres e-mail jest wymagany');
+            throw new ValidationError('emailRequired');
         } else if (!regex.test(obj.email)) {
-            throw new ValidationError('To nie jest prawidłowy adres e-mail');
+            throw new ValidationError('invalidEmail');
         }
         this.userId = obj.userId;
         this.email = obj.email;
@@ -38,7 +38,7 @@ export class UserRecord implements  UserEntity {
             authToken: this.authToken,
             userState: this.userState
         }).catch(() => {
-            throw new ValidationError('Dodanie użytkownika zakończone niepowodzeniem.')
+            throw new ValidationError('userAddFailed')
         });
     }
 
@@ -46,7 +46,7 @@ export class UserRecord implements  UserEntity {
         try {
             return await bcrypt.hash(password, salt);
         } catch (err) {
-            throw new ValidationError('Coś poszło nie tak');
+            throw new ValidationError('tryLater');
         }
     }
 
@@ -75,7 +75,7 @@ export class UserRecord implements  UserEntity {
         if (this.checkPasswordStrength()) {
             const user: UserRecord | null = await UserRecord.getOne(this.email);
             if (user === null) {
-                throw new ValidationError('Podany został nie prawidłowy adres e-mail');
+                throw new ValidationError('invalidEmail');
             }
             try {
                 if (await bcrypt.compare(this.password, user.password)){
@@ -87,10 +87,10 @@ export class UserRecord implements  UserEntity {
                 }
             } catch (err) {
                 console.error(err.message);
-                throw new ValidationError('Wystąpił błąd przy próbie logowania');
+                throw new ValidationError('tryLater');
             }
         } else {
-            throw new ValidationError('Hasło nie spełnia wymagań bezpieczeństwa.')
+            throw new ValidationError('passwordInsecure')
         }
     }
 
@@ -124,24 +124,17 @@ export class UserRecord implements  UserEntity {
             const results = await  pool('registration_tokens')
                 .select('userId')
                 .where('registrationToken',newToken) as UserRecord[];
-            // const [results] = await pool.execute('SELECT `userId` FROM `registration_tokens` WHERE `registrationToken` = :token', {
-            //     token: newToken,
-            // }) as UserRecordResult;
+
             isThisToken = results.length;
         } while (isThisToken > 0)
         const results = await pool('registration_tokens')
             .select('userId')
             .where('userId',id) as RegistrationTokenEntity[];
-        // const [results] = (await pool.execute('SELECT `userId` FROM `registration_tokens` WHERE `userId` = :userId', {
-        //     userId: id,
-        //  })) as RegistrationTokenResult;
+
         if (results.length > 0) {
             await pool('registration_tokens')
                 .where('userId', id)
                 .del();
-            // await pool.execute('DELETE FROM `registration_tokens` WHERE `userId` = :userId', {
-            //     userId: id,
-            // });
         }
         await pool('registration_tokens')
             .insert({
@@ -149,10 +142,6 @@ export class UserRecord implements  UserEntity {
                 registrationToken: newToken,
                 tokenExpiresOn: pool.raw('ADDDATE(NOW(), INTERVAL 1 DAY)'),
             })
-        // await pool.execute('INSERT INTO `registration_tokens` (`userId`, `registrationToken`, `tokenExpiresOn`) VALUES (:userId, :token, ADDDATE(NOW(), INTERVAL 1 DAY))', {
-        //     userId: id,
-        //     token: newToken,
-        // });
         return newToken;
     }
 
@@ -164,19 +153,12 @@ export class UserRecord implements  UserEntity {
         await pool('registration_tokens')
             .where('userId',id)
             .del();
-        // await pool.execute('DELETE FROM `registration_tokens` WHERE `userId` = :id', {
-        //     id,
-        // });
     }
 
     static async updateEmail(id: string, email: string): Promise<void> {
         await pool('user')
             .where('userId',id)
             .update({ email });
-        // await pool.execute('UPDATE `users` SET `email` = :email WHERE `userId` = :id', {
-        //     email,
-        //     id,
-        // });
     }
 
     static async updateStudentStatus(studentId: string, userStatus: number): Promise<void> {
@@ -184,10 +166,6 @@ export class UserRecord implements  UserEntity {
         await pool('students')
             .where({ studentId })
             .update({ userStatus })
-        // await pool.execute('UPDATE `students` SET `userStatus` = :userStatus WHERE `studentId` = :studentId', {
-        //     studentId,
-        //     userStatus,
-        // });
     }
 
     static async getEmail(userId: string): Promise<string> {
@@ -195,7 +173,6 @@ export class UserRecord implements  UserEntity {
             .select('email')
             .where({ userId })
             .first() as { email: string };
-        // const [results] = await pool.execute('SELECT `email` FROM `users` WHERE `userId`=:id', { id }) as UserRecordResult;
 
         return results === null ? null : results.email;
 
