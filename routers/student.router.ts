@@ -13,7 +13,7 @@ export const studentRouter = Router();
 studentRouter
 
     .get('/students', async (req, res) => {
-        const query= convertTypes(req.query) as FilterQuery;
+        const query = convertTypes(req.query) as FilterQuery;
         const availableStudents = new StudentFilter(query);
         await hrExists(availableStudents.hrId);
         const data = await availableStudents.getStudents();

@@ -241,30 +241,32 @@ export class StudentRecord implements StudentEntity {
 
       const results = await pool('students')
           .select(
-              'firstName',
-              'lastName',
-              'githubUsername',
-              'phoneNumber',
-              'expectedTypeWork',
-              'targetWorkCity',
-              'expectedContractType',
-              'expectedSalary',
-              'canTakeApprenticeship',
-              'monthsOfCommercialExp',
-              'bio',
-              'education',
-              'courses',
-              'workExperience',
-              'portfolioUrls',
-              'bonusProjectUrls',
-              'projectUrls',
-              'userStatus',
-              'courseCompletion',
-              'courseEngagement',
-              'projectDegree',
-              'teamProjectDegree'
+              'students.firstName',
+              'students.lastName',
+              'students.githubUsername',
+              'students.phoneNumber',
+              'students.expectedTypeWork',
+              'students.targetWorkCity',
+              'students.expectedContractType',
+              'students.expectedSalary',
+              'students.canTakeApprenticeship',
+              'students.monthsOfCommercialExp',
+              'students.bio',
+              'students.education',
+              'students.courses',
+              'students.workExperience',
+              'students.portfolioUrls',
+              'students.bonusProjectUrls',
+              'students.projectUrls',
+              'students.userStatus',
+              'students.courseCompletion',
+              'students.courseEngagement',
+              'students.projectDegree',
+              'students.teamProjectDegree',
+              'users.email',
           )
           .where({ studentId })
+          .join('users', 'students.studentId', '=', 'users.userId')
           .first() as StudentEntity;
       console.log(results);
       return results;
