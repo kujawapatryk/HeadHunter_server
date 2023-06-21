@@ -3,6 +3,8 @@ import { v4 as uuid } from 'uuid';
 import { UserRecord } from '../records/user.record';
 import { HrRecord } from '../records/hr.record';
 import { sendMail } from '../utils/sendMail';
+import { pool } from '../config/db';
+import { ValidationError } from '../utils/errors';
 
 export const adminRouter = Router();
 // zalogowany admin
@@ -11,6 +13,12 @@ adminRouter
 
         const { email,fullName,company,maxReservedStudents } = req.body;
 
+        const result = await pool('users')
+            .select('userId')
+            .where({ email })
+            .first();
+
+        if(result !== undefined) throw new ValidationError('emailExists');
         const userId = uuid();
         const userData = {
             userId,
