@@ -1,5 +1,12 @@
 import { pool } from '../config/db';
-import { AvailableStudent, expectedContractType, expectedTypeWork, FilterQuery, Internship } from '../types';
+import {
+    AvailableStudent,
+    expectedContractType,
+    expectedTypeWork,
+    FilterQuery,
+    Internship,
+    StudentStatus
+} from '../types';
 
 export class StudentFilter implements FilterQuery{
     remoteWork: boolean;
@@ -124,14 +131,14 @@ export class StudentFilter implements FilterQuery{
         if(this.action === 'all')
             return{
                 select: selectAll,
-                userStatus: 1,
+                userStatus: StudentStatus.active,
                 reservedBy: null,
             }
         else if(this.action === 'reserved')
         {
             return{
                 select: selectReserved,
-                userStatus: 2,
+                userStatus: StudentStatus.reserved,
                 reservedBy: this.hrId,
             }
         }
