@@ -1,7 +1,7 @@
 import { ValidationError } from '../utils/errors';
 import { Octokit } from '@octokit/core';
 import { pool } from '../config/db';
-import { StudentEntity, UpdateAction } from '../types';
+import { Employed, StudentEntity, UpdateAction } from '../types';
 import { sendMail } from '../utils/sendMail';
 import { open } from 'fs/promises';
 import { unlink } from 'node:fs';
@@ -186,10 +186,6 @@ export class StudentRecord implements StudentEntity {
 
   static async statusChange(action:UpdateAction, studentId:string, hrId:string):Promise<string> {
 
-      //active - 1
-      // reserved - 2
-      // hired - 3
-
       let userStatus=0;
       let reservationExpiresOn:null|Date;
       let message='';
@@ -216,7 +212,6 @@ export class StudentRecord implements StudentEntity {
           userStatus = UpdateAction.disinterest;
           hrId=null;
           message= 'disinterest';
-
       }
       else{
           throw new ValidationError('statusChangeFailed');
@@ -346,4 +341,28 @@ export class StudentRecord implements StudentEntity {
           });
       }
   }
+
+  static async employedStudents(): Promise<Employed[] | undefined> {
+
+      const result = pool('students')
+          .select(
+              'students.studentId',
+              'students.firstName',
+              'students.lastName',
+              'students.githubUsername',
+              'students.reservedBy',
+              'hrs.fullName',
+              'hrs.company'
+          )
+          .where('userStatus',4)
+          .where('users.userState',4)
+          .join('users', 'students.studentId', '=', 'users.userId')
+          .join('hrs', 'students.reservedBy', '=', 'hrs.hrId');
+
+      if(result !== undefined)
+          return result;
+      else
+          throw new ValidationError('noStudentsMessage');
+  }
+
 }
