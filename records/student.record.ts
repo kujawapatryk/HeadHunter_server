@@ -1,7 +1,7 @@
 import { ValidationError } from '../utils/errors';
 import { Octokit } from '@octokit/core';
 import { pool } from '../config/db';
-import { Employed, StudentEntity, UpdateAction } from '../types';
+import { StudentEntity, UpdateAction } from '../types';
 import { sendMail } from '../utils/sendMail';
 import { open } from 'fs/promises';
 import { unlink } from 'node:fs';
@@ -340,29 +340,6 @@ export class StudentRecord implements StudentEntity {
               if (err) throw err;
           });
       }
-  }
-
-  static async employedStudents(): Promise<Employed[] | undefined> {
-
-      const result = pool('students')
-          .select(
-              'students.studentId',
-              'students.firstName',
-              'students.lastName',
-              'students.githubUsername',
-              'students.reservedBy',
-              'hrs.fullName',
-              'hrs.company'
-          )
-          .where('userStatus',4)
-          .where('users.userState',4)
-          .join('users', 'students.studentId', '=', 'users.userId')
-          .join('hrs', 'students.reservedBy', '=', 'hrs.hrId');
-
-      if(result !== undefined)
-          return result;
-      else
-          throw new ValidationError('noStudentsMessage');
   }
 
 }
