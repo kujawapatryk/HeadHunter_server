@@ -186,10 +186,6 @@ export class StudentRecord implements StudentEntity {
 
   static async statusChange(action:UpdateAction, studentId:string, hrId:string):Promise<string> {
 
-      //active - 1
-      // reserved - 2
-      // hired - 3
-
       let userStatus=0;
       let reservationExpiresOn:null|Date;
       let message='';
@@ -216,7 +212,6 @@ export class StudentRecord implements StudentEntity {
           userStatus = UpdateAction.disinterest;
           hrId=null;
           message= 'disinterest';
-
       }
       else{
           throw new ValidationError('statusChangeFailed');
@@ -346,4 +341,5 @@ export class StudentRecord implements StudentEntity {
           });
       }
   }
+
 }

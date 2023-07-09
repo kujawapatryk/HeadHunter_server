@@ -5,6 +5,7 @@ import { HrRecord } from '../records/hr.record';
 import { sendMail } from '../utils/sendMail';
 import { pool } from '../config/db';
 import { ValidationError } from '../utils/errors';
+import { employedStudents, employedStudentsCount } from '../utils/employedStudents';
 
 export const adminRouter = Router();
 // zalogowany admin
@@ -35,9 +36,23 @@ adminRouter
 
         await addUser.insert();
         await addHr.insert();
-        //  const token = await UserRecord.addToken(userId);
 
         await sendMail(email,'MegaK Head hunter - rejestracja','jakś wiadomośc z linkiem aktywacyjnym  http://adres.pl/aktywacja/TOKEN'); //TODO Dodanie generowanie tokenu,  dodanie tekstu maila
         res.status(200).json({ success: true, message: 'userHRAdded' });
 
+    })
+    .get('/employed-students', async (req, res) => {
+        const query = {
+            page: Number(req.query.page),
+            rowsPerPage: Number(req.query.rowsPerPage),
+        };
+
+        const student = await employedStudents(query);
+        const totalCount = await employedStudentsCount();
+        const data = {
+            student,
+            totalCount,
+        };
+
+        res.json(data);
     })
