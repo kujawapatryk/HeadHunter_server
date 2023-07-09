@@ -5,7 +5,7 @@ import { HrRecord } from '../records/hr.record';
 import { sendMail } from '../utils/sendMail';
 import { pool } from '../config/db';
 import { ValidationError } from '../utils/errors';
-import { StudentRecord } from '../records/student.record';
+import { employedStudents, employedStudentsCount } from '../utils/employedStudents';
 
 export const adminRouter = Router();
 // zalogowany admin
@@ -42,7 +42,17 @@ adminRouter
 
     })
     .get('/employed-students', async (req, res) => {
+        const query = {
+            page: Number(req.query.page),
+            rowsPerPage: Number(req.query.rowsPerPage),
+        };
 
-        const data = await StudentRecord.employedStudents();
+        const student = await employedStudents(query);
+        const totalCount = await employedStudentsCount();
+        const data = {
+            student,
+            totalCount,
+        };
+
         res.json(data);
     })
