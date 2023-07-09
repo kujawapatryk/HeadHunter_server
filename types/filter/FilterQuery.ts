@@ -45,6 +45,6 @@ export interface FilterCon {
 
 export interface Pagination{
   page: number,
-  rowsPerPage:number,
-  allRecords:number
+  rowsPerPage: number,
+  allRecords?: number
 }
