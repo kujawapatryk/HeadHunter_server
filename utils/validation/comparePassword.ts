@@ -1,4 +1,4 @@
-import { ValidationError } from './errors';
+import { ValidationError } from '../errors';
 
 export const comparePassword = (password:string, confirmedPassword:string) => {
     if(password !== confirmedPassword)
