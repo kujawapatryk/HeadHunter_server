@@ -9,16 +9,19 @@ import { hrRouter } from './routers/hr.router';
 import { authRouter } from './routers/auth.router';
 import { handleError } from './utils/errors';
 import { config } from './config/config';
+import cookieParser from 'cookie-parser';
 
 const app = express();
+
+app.use(json());
+app.use(cookieParser());
 
 app.use(
     cors({
         origin: config.corsOrigin,
+        credentials: true,
     }),
 );
-
-app.use(json());
 
 app.use('/user', userRouter);
 app.use('/student', studentRouter);
@@ -27,6 +30,7 @@ app.use('/manage', adminRouter);
 app.use('/', homeRouter);
 app.use('/auth', authRouter)
 app.use(handleError);
-app.listen(3001, 'localhost', () => {
-    console.log('Listening on http://localhost:3001');
+
+app.listen(3001, '127.0.0.1', () => {
+    console.log('Listening on http://127.0.0.1:3001');
 });
