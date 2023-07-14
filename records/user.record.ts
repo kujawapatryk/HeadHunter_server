@@ -5,6 +5,8 @@ import bcrypt from 'bcrypt';
 import { v4 as uuid } from 'uuid';
 import { sendMail } from '../utils/sendMail';
 import { config } from '../config/config';
+import { emailRegex } from '../utils/validation/emailRegex';
+import { passwordRegex } from '../utils/validation/passwordRegex';
 
 export class UserRecord implements  UserEntity {
 
@@ -53,9 +55,8 @@ export class UserRecord implements  UserEntity {
     // }
 
     static async resetPassword(email:string){
-        const regexEmail = /^\S+@\S+\.\S+$/;
-        if(!regexEmail.test(email))
-            throw new ValidationError('invalidEmail');
+
+        emailRegex(email);
 
         const result = await pool('users')
             .select('userId')
@@ -69,13 +70,6 @@ export class UserRecord implements  UserEntity {
 
     }
 
-    checkPasswordStrength(): boolean {
-        const passwordRegex = /^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&*])(?=.{8,})/; // cyfra/mała litera/duża litera/znakspecjalny/min 8 znaków
-        if(!passwordRegex.test(this.password))
-            throw new ValidationError('invalidPasswordFormat');
-        return true
-    }
-
     static async getOne(email: string):Promise<UserRecord | null> {
 
         const results = await pool('users')
@@ -87,11 +81,13 @@ export class UserRecord implements  UserEntity {
     }
 
     async checkPassword() {
-        if (this.checkPasswordStrength()) {
+        if (passwordRegex(this.password)) {
             const user: UserRecord | null = await UserRecord.getOne(this.email);
+
             if (user === null) {
                 throw new ValidationError('invalidEmail');
             }
+
             try {
                 if (await bcrypt.compare(this.password, user.password)){
                     return {
@@ -99,13 +95,15 @@ export class UserRecord implements  UserEntity {
                         state: user.userState
                     }
 
+                }else {
+                    throw new ValidationError('invalidCredentials');
                 }
             } catch (err) {
                 console.error(err.message);
                 throw new ValidationError('tryLater');
             }
         } else {
-            throw new ValidationError('passwordInsecure')
+            throw new ValidationError('passwordInsecure');
         }
     }
 
@@ -162,17 +160,18 @@ export class UserRecord implements  UserEntity {
         return newToken;
     }
 
-    async hashPassword(): Promise<void> {
+    async hashPassword(): Promise<string> {
         try {
             const salt = bcrypt.genSaltSync(10);
             this.password = await bcrypt.hash(this.password, salt)
+            return this.password;
         }catch (e){
             throw new ValidationError('tryLater');
         }
     }
 
     async updatePassword(): Promise<void> {
-        this.checkPasswordStrength();
+        passwordRegex(this.password);
         await this.hashPassword;
 
         await pool('users')
@@ -199,13 +198,13 @@ export class UserRecord implements  UserEntity {
             .update({ userStatus })
     }
 
-    static async getEmail(userId: string): Promise<string> {
+    static async getEmail(token: string): Promise<any> {
         const results = await  pool('users')
-            .select('email')
-            .where({ userId })
-            .first() as { email: string };
-
-        return results === null ? null : results.email;
+            .select('*')
+            .where('authToken', token)
+            .first();
+        console.log(results);
+        return results === null ? null : results;
 
     }
 }
