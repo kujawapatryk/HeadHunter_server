@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Request, Response, Router } from 'express';
 import { v4 as uuid } from 'uuid';
 import { UserRecord } from '../records/user.record';
 import { HrRecord } from '../records/hr.record';
@@ -6,11 +6,13 @@ import { sendMail } from '../utils/sendMail';
 import { pool } from '../config/db';
 import { ValidationError } from '../utils/errors';
 import { employedStudents, employedStudentsCount, restoreStudent } from '../utils/employedStudents';
+import { verifyCookie } from '../auth/auth';
+import { UserState } from '../types';
 
 export const adminRouter = Router();
 // zalogowany admin
 adminRouter
-    .post('/add-hr/',async (req,res) =>{
+    .post('/add-hr/', verifyCookie([UserState.admin]), async (req,res) =>{
 
         const { email,fullName,company,maxReservedStudents } = req.body;
 
@@ -41,7 +43,8 @@ adminRouter
         res.status(200).json({ success: true, message: 'userHRAdded' });
 
     })
-    .get('/employed-students', async (req, res) => {
+    .get('/employed-students', verifyCookie([UserState.admin]) ,async (req:Request, res:Response) => {
+
         const query = {
             page: Number(req.query.page),
             rowsPerPage: Number(req.query.rowsPerPage),
@@ -54,7 +57,9 @@ adminRouter
             totalCount,
         };
 
-        res.json(data);
+        res
+            .cookie('xxxxxx','xxawqa')
+            .json(data);
     })
     .get('/restore-student/:studentId', async (req, res) => {
         const { studentId } = req.params;

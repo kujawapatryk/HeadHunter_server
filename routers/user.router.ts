@@ -1,7 +1,11 @@
 import { Request, Response, Router } from 'express';
 import { UserRecord } from '../records/user.record';
 import { ValidationError } from '../utils/errors';
-import { comparePassword } from '../utils/comparePassword';
+import { comparePassword } from '../utils/validation/comparePassword';
+import { createToken, generateToken } from '../auth/token';
+import { verifyCookie } from '../auth/auth';
+import { UserEntity, UserState } from '../types';
+import { extraLoginData } from '../utils/extraLoginData';
 
 export const userRouter = Router();
 
@@ -9,23 +13,39 @@ userRouter
 
     .post('/login', async (req: Request, res: Response) => {
         const params = new UserRecord(req.body);
-        const response = await params.checkPassword();
-        if (response.id) {
-            res.json(response);
-            // const token = jwt.sign({ email: newParams.email }, /* @todo SET SECRET KEY process.env.secret_key*/'SEKRET', { expiresIn: '24h' });
-            // res.json({ token });
+        const result = await params.checkPassword();
+        console.log(result)
+
+        if (result.id) {
+
+            const token = createToken(await generateToken(result.id))
+            const extraData = await extraLoginData(result.id,result.state)
+
+            res.cookie('token', token,{
+                secure: false,
+                domain: '127.0.0.1',
+                httpOnly: true,
+            })
+                .json({
+                    token,
+                    ...result,
+                    ...extraData,
+                });
+
         } else {
             throw new ValidationError('Błędne hasło')
         }
 
     })
-    // .post('/refresh', async (req, res) => {
-    //     // refresh jwt
-    // })
-    //
-    // .delete('/logout', async (req, res) => {
-    //     // czyszczenie tokenów i wylogowanie
-    // })
+
+// })
+// .post('/refresh', async (req, res) => {
+//     // refresh jwt
+// })
+//
+// .delete('/logout', async (req, res) => {
+//     // czyszczenie tokenów i wylogowanie
+// })
 
     .post('/my-status', async (req, res) => {
         const { studentId, userStatus } = req.body;
@@ -64,40 +84,23 @@ userRouter
 //     await UserRecord.addToken(userId);
 //     res.json(req.params.email);
 // })
-    .patch('/new-password',async (req,res) =>{
-        const { userId, token, password, confirmedPassword } = req.body;
-        console.log({ userId, token, password, confirmedPassword })
+    .patch('/new-password', verifyCookie([UserState.admin, UserState.hr, UserState.student]), async (req,res) =>{
+        const { token, password, confirmedPassword } = req.body;
+        const { userId } = req.user  as UserEntity;
         await UserRecord.checkToken(token, userId);
+
         comparePassword(password,confirmedPassword);
+
         const user = new UserRecord({ userId,password });
-        console.log(user.password);
-        console.log(await user.hashPassword());
-        console.log(user.password);
-        console.log(user);
         await user.updatePassword();
         await user.deleteToken();
         res.json({ message: 'passwordSuccessfullyChanged' }).status(200);
 
     })
 
-// .patch('/newpass', async (req: Request, res: Response) => {
-//     const { id, pass, pass2 } = req.body;
-//
-//     const passwordRegex = /^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&*])(?=.{8,})/;
-//
-//     if (!passwordRegex.test(pass)) {
-//         throw new ValidationError('invalidPasswordFormat');
-//     }
-//     if (pass !== pass2) {
-//         throw new ValidationError('mismatchedPasswords');
-//     }
-//     const hashPassword = await hash(pass, 10);
-//     await UserRecord.updatePassword(id, hashPassword); //@ TODO do poprawy. zrobić to jako klasa
-//     res.json(true);
-// })
-
-    .patch('/changemail', async (req: Request, res: Response) => {
-        const { id, email } = req.body;
+    .patch('/changemail', verifyCookie([UserState.admin, UserState.hr, UserState.student]), async (req: Request, res: Response) => {
+        const { email } = req.body;
+        const { userId } = req.user  as UserEntity;
         const isEmail = await UserRecord.checkEmail(email);
 
         if(isEmail!==null){
@@ -107,6 +110,6 @@ userRouter
         if (!email.includes('@')) {
             throw new ValidationError('invalidEmail');
         }
-        await UserRecord.updateEmail(id, email);
+        await UserRecord.updateEmail(userId, email);
         res.json(true);
     });
