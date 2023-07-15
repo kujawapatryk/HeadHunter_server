@@ -5,7 +5,7 @@ import { FilterQuery, UpdateStatus, UserEntity, UserState } from '../types';
 import multer from 'multer';
 import { convertTypes } from '../utils/convertTypes';
 import { hrExists } from '../utils/hrExists';
-import { verifyCookie } from '../auth/auth';
+import { auth } from '../auth/auth';
 
 const upload = multer({ dest: './utils/download/' })
 
@@ -13,7 +13,7 @@ export const studentRouter = Router();
 
 studentRouter
 
-    .get('/students', verifyCookie([UserState.hr]), async (req, res) => {
+    .get('/students', auth([UserState.hr]), async (req, res) => {
         const query = convertTypes(req.query) as FilterQuery;
         const { userId } = req.user as UserEntity;
         const queryWithHr = {
@@ -32,7 +32,7 @@ studentRouter
         res.json(newData);
     })
 
-    .patch('/status', verifyCookie([UserState.hr]), async (req, res) => {
+    .patch('/status', auth([UserState.hr]), async (req, res) => {
         const { action, studentId }: UpdateStatus = req.body;
         const { userId } = req.user as UserEntity;
         await hrExists(userId);
@@ -42,7 +42,7 @@ studentRouter
             .json({ success: true, message: message });
     })
 
-    .get('/getcv/:studentId', verifyCookie([UserState.hr]), async (req, res) => {
+    .get('/getcv/:studentId', auth([UserState.hr]), async (req, res) => {
         const { studentId }= req.params;
         const { userId } = req.user as UserEntity;
         await hrExists(userId);
@@ -50,13 +50,13 @@ studentRouter
         res.json(data);
     })
 
-    .get('/getcvedit', verifyCookie([UserState.student]), async (req, res) => {
+    .get('/getcvedit', auth([UserState.student]), async (req, res) => {
         const { userId } = req.user as UserEntity;
         const data = await StudentRecord.getCvOneStudentEdit(userId);
         res.json(data);
     })
 
-    .patch('/changedata', verifyCookie([UserState.student]), async (req, res) => {
+    .patch('/changedata', auth([UserState.student]), async (req, res) => {
         const newStudent = new StudentRecord(req.body);
         const data = await newStudent.update();
         res.json(data);

@@ -6,13 +6,13 @@ import { sendMail } from '../utils/sendMail';
 import { pool } from '../config/db';
 import { ValidationError } from '../utils/errors';
 import { employedStudents, employedStudentsCount, restoreStudent } from '../utils/employedStudents';
-import { verifyCookie } from '../auth/auth';
+import { auth } from '../auth/auth';
 import { UserState } from '../types';
 
 export const adminRouter = Router();
 // zalogowany admin
 adminRouter
-    .post('/add-hr/', verifyCookie([UserState.admin]), async (req,res) =>{
+    .post('/add-hr/', auth([UserState.admin]), async (req, res) =>{
 
         const { email,fullName,company,maxReservedStudents } = req.body;
 
@@ -43,7 +43,7 @@ adminRouter
         res.status(200).json({ success: true, message: 'userHRAdded' });
 
     })
-    .get('/employed-students', verifyCookie([UserState.admin]) ,async (req:Request, res:Response) => {
+    .get('/employed-students', auth([UserState.admin]) ,async (req:Request, res:Response) => {
 
         const query = {
             page: Number(req.query.page),

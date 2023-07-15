@@ -11,7 +11,7 @@ type DecodedToken = {
     exp: number,
 }
 
-export const verifyCookie = (states: number[]) => async  (req: Request, res: Response, next: NextFunction) => {
+export const auth = (states: number[]) => async  (req: Request, res: Response, next: NextFunction) => {
 
     try {
         const { token }  = req.cookies;
