@@ -17,13 +17,6 @@ export class UserRecord implements  UserEntity {
     userState?: number
 
     constructor(obj: UserEntity) {
-    //    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-        // if (!obj.email) {
-        //     throw new ValidationError('emailRequired');
-        // } else if (!regex.test(obj.email)) {
-        //     throw new ValidationError('invalidEmail');
-        // }
         this.userId = obj.userId;
         this.email = obj.email;
         this.password = obj.password;
@@ -45,14 +38,6 @@ export class UserRecord implements  UserEntity {
             throw new ValidationError('userAddFailed')
         });
     }
-
-    // async hashPassword(password: string, salt: string): Promise<string> {
-    //     try {
-    //         return await bcrypt.hash(password, salt);
-    //     } catch (err) {
-    //         throw new ValidationError('tryLater');
-    //     }
-    // }
 
     static async resetPassword(email:string){
 
@@ -95,12 +80,10 @@ export class UserRecord implements  UserEntity {
                         state: user.userState
                     }
 
-                }else {
-                    throw new ValidationError('invalidCredentials');
                 }
             } catch (err) {
                 console.error(err.message);
-                throw new ValidationError('tryLater');
+                throw new ValidationError('invalidCredentials');
             }
         } else {
             throw new ValidationError('passwordInsecure');
@@ -132,7 +115,7 @@ export class UserRecord implements  UserEntity {
         return results === undefined ? null : results.userId;
     }
 
-    static async addToken(id: string): Promise<string> {
+    static async addToken(id: string): Promise<string> { // do
         let newToken, isThisToken;
         do {
             newToken = uuid();
