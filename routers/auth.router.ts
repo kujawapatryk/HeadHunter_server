@@ -1,12 +1,63 @@
-import { Router } from 'express';
-import { authMiddleware } from '../middlewares/auth.middleware';
-import { userController } from '../controllers/controllers';
+import { Request, Response, Router } from 'express';
+import { UserRecord } from '../records/user.record';
+import { createToken, generateToken } from '../auth/token';
+import { extraLoginData } from '../utils/extraLoginData';
+import { ValidationError } from '../utils/errors';
+import { auth } from '../auth/auth';
+import { UserEntity, UserState } from '../types';
+import { pool } from '../config/db';
 
-// ROUTER DLA ŚCIEŻEK Z OGRANICZONYM DOSTĘPEM, NP. KIEDY CHCEMY ŻEBY UŻYTKOWNIK
-// MUSIAŁ MIEĆ USTAWIONY POPRAWNY I WAŻNY JWT TOKEN ŻEBY DOSTAĆ SIĘ DO DANEGO ZASOBU
-// W INNYM WYPADKU WYSYŁAMY INFORMACJĘ, ŻE JEST NIEAUTORYZOWANY
-// TOKEN W ZAPYTANIU TRZEBA WYSYŁAĆ W NAGŁÓWKU "Authorization"
 export const authRouter = Router();
 
 // representation of path accessible only for logged-in users
-authRouter.post('/decode-token', authMiddleware, userController)
+authRouter
+
+    .post('/login', async (req: Request, res: Response) => {
+        const params = new UserRecord(req.body);
+        const result = await params.checkPassword();
+        console.log(params)
+        if (result.id) {
+
+            const token = createToken(await generateToken(result.id))
+            const extraData = await extraLoginData(result.id,result.state)
+
+            res.cookie('token', token,{
+                secure: false,
+                domain: '127.0.0.1',
+                httpOnly: true,
+            })
+                .json({
+                    token,
+                    ...result,
+                    ...extraData,
+                });
+
+        } else {
+            throw new ValidationError('Błędne hasło')
+        }
+
+    })
+
+    .get('/logout', auth([UserState.admin, UserState.hr, UserState.student]), async (req,res) => {
+        const { userId } = req.user as UserEntity;
+        pool('user')
+            .update('authToken', null)
+            .where({ userId })
+
+        res.clearCookie('token',{
+            secure: false,
+            domain: '127.0.0.1',
+            httpOnly: true,
+        })
+            .json({ status: 'ok', message: 'logout' })
+
+    })
+
+    .get('/extra-login-data', auth([UserState.admin, UserState.hr, UserState.student]), async (req,res) => {
+        const { userId, userState } = req.user as UserEntity;
+        const data = {
+            state: userState,
+            ...await extraLoginData(userId, userState)
+        }
+        res.json(data);
+    })
