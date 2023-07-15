@@ -30,6 +30,7 @@ studentRouter
         const { action, studentId, hrId }: UpdateStatus = req.body;
         await hrExists(hrId);
         const message = await StudentRecord.statusChange(action, studentId, hrId);
+
         res.status(200).json({ success: true, message: message });
     })
 

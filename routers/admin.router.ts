@@ -5,7 +5,7 @@ import { HrRecord } from '../records/hr.record';
 import { sendMail } from '../utils/sendMail';
 import { pool } from '../config/db';
 import { ValidationError } from '../utils/errors';
-import { employedStudents, employedStudentsCount } from '../utils/employedStudents';
+import { employedStudents, employedStudentsCount, restoreStudent } from '../utils/employedStudents';
 
 export const adminRouter = Router();
 // zalogowany admin
@@ -37,7 +37,7 @@ adminRouter
         await addUser.insert();
         await addHr.insert();
 
-        await sendMail(email,'MegaK Head hunter - rejestracja','jakś wiadomośc z linkiem aktywacyjnym  http://adres.pl/aktywacja/TOKEN'); //TODO Dodanie generowanie tokenu,  dodanie tekstu maila
+        await sendMail(email,'MegaK Head hunter - rejestracja','jakś wiadomośc z linkiem aktywacyjnym  https://adres.pl/aktywacja/TOKEN'); //TODO Dodanie generowanie tokenu,  dodanie tekstu maila
         res.status(200).json({ success: true, message: 'userHRAdded' });
 
     })
@@ -55,4 +55,10 @@ adminRouter
         };
 
         res.json(data);
+    })
+    .get('/restore-student/:studentId', async (req, res) => {
+        const { studentId } = req.params;
+        const result = await restoreStudent(studentId);
+
+        res.json(result);
     })

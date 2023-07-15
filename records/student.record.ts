@@ -1,7 +1,7 @@
 import { ValidationError } from '../utils/errors';
 import { Octokit } from '@octokit/core';
 import { pool } from '../config/db';
-import { StudentEntity, UpdateAction } from '../types';
+import { StudentEntity, StudentStatus, UpdateAction, UserState } from '../types';
 import { sendMail } from '../utils/sendMail';
 import { open } from 'fs/promises';
 import { unlink } from 'node:fs';
@@ -91,7 +91,7 @@ export class StudentRecord implements StudentEntity {
       }
       if (isNaN(obj.expectedSalary)) {
           throw new ValidationError('Oczekiwana wysokość pensji musi być liczbą')
-      }
+      } // do sprawdzenia
 
       if (obj.courseCompletion < 0 || obj.courseCompletion > 5){
           throw new ValidationError('Ocena musi być w zakresie 0-5')
@@ -118,7 +118,7 @@ export class StudentRecord implements StudentEntity {
       }
     
       obj.portfolioUrls.split(' ').forEach(el => {
-          if ((!/^(ftp|http|https):\/\/[^ "]+$/.test(el)&&(el!==''))) {
+          if ((!/^(http|https):\/\/[^ "]+$/.test(el)&&(el!==''))) {
               throw new ValidationError('To nie jest link do portfolio')
           }
       })
@@ -191,6 +191,7 @@ export class StudentRecord implements StudentEntity {
       let message='';
 
       if (action === UpdateAction.reserve) {
+
           const results = await pool('students')
               .select('studentId')
               .where('studentId', studentId)
@@ -202,16 +203,35 @@ export class StudentRecord implements StudentEntity {
           reservationExpiresOn = new Date(now.getTime() + 10 * 24 * 60 * 60 * 1000);
           userStatus = UpdateAction.reserve;
           message= 'reserve';
-      } else if (action === UpdateAction.employ) {
-          reservationExpiresOn = null;
-          userStatus = UpdateAction.employ;
-          message= 'employ';
-          await sendMail('headhunter@testHeadHunter.oi','student o id:'+studentId+' został zatrudniony','student o id:'+studentId+' został zatrudniony') //@TODO to consider what text should be sent
-      } else if (action === UpdateAction.disinterest){
+
+      } else if (action === UpdateAction.disinterest) {
+
           reservationExpiresOn = null;
           userStatus = UpdateAction.disinterest;
           hrId=null;
           message= 'disinterest';
+
+      } else if (action === UpdateAction.employ){
+
+          await pool.transaction(async (trx) => {
+              await trx('students')
+                  .update({
+                      userStatus: StudentStatus.hired,
+                  })
+                  .where({ studentId });
+
+              await trx('users')
+                  .update({
+                      userState: UserState.hired,
+                  })
+                  .where({ userId: studentId });
+
+          }).then( async () => {
+              await sendMail('headhunter@testHeadHunter.oi','student o id:'+studentId+' został zatrudniony','student o id:'+studentId+' został zatrudniony') //@TODO to consider what text should be sent
+          }).catch(() => {
+              throw new ValidationError('statusChangeFailed')
+          })
+          return 'employ';
       }
       else{
           throw new ValidationError('statusChangeFailed');
@@ -263,7 +283,7 @@ export class StudentRecord implements StudentEntity {
           .where({ studentId })
           .join('users', 'students.studentId', '=', 'users.userId')
           .first() as StudentEntity;
-      console.log(results);
+
       return results;
   }
 

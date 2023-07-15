@@ -1,6 +1,8 @@
-export enum userState{
+export enum UserState{
     inActive,
     student,
     hr,
-    admin
+    admin,
+    hired
+
 }
