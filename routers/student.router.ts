@@ -42,7 +42,7 @@ studentRouter
             .json({ success: true, message: message });
     })
 
-    .get('/getcv/:studentId', auth([UserState.hr]), async (req, res) => {
+    .get('/get-cv/:studentId', auth([UserState.hr]), async (req, res) => {
         const { studentId }= req.params;
         const { userId } = req.user as UserEntity;
         await hrExists(userId);
