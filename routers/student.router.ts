@@ -50,14 +50,19 @@ studentRouter
         res.json(data);
     })
 
-    .get('/getcvedit', auth([UserState.student]), async (req, res) => {
+    .get('/get-cv-edit', auth([UserState.student]), async (req, res) => {
         const { userId } = req.user as UserEntity;
         const data = await StudentRecord.getCvOneStudentEdit(userId);
-        res.json(data);
+        res.json(data).status(200);
     })
 
-    .patch('/changedata', auth([UserState.student]), async (req, res) => {
-        const newStudent = new StudentRecord(req.body);
+    .patch('/change-data', auth([UserState.student]), async (req, res) => {
+        const { userId } = req.user as UserEntity;
+        const student = {
+            ...req.body,
+            studentId: userId,
+        }
+        const newStudent = new StudentRecord(student);
         const data = await newStudent.update();
         res.json(data);
     })

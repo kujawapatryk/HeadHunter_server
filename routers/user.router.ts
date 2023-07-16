@@ -4,6 +4,8 @@ import { ValidationError } from '../utils/errors';
 import { comparePassword } from '../utils/validation/comparePassword';
 import { auth } from '../auth/auth';
 import { UserEntity, UserState } from '../types';
+import { emailRegex } from '../utils/validation/emailRegex';
+import { passwordRegex } from '../utils/validation/passwordRegex';
 
 export const userRouter = Router();
 
@@ -28,6 +30,7 @@ userRouter
         res.json({ status: 'ok', message:'emailResetSent' }).status(200);
     })
 
+    //@TODO sprawdzić, brak autoryzacji, link z maila
     .patch('/new-password', auth([UserState.admin, UserState.hr, UserState.student]), async (req, res) =>{
         const { token, password, confirmedPassword } = req.body;
         const { userId } = req.user  as UserEntity;
@@ -42,18 +45,28 @@ userRouter
 
     })
 
-    .patch('/changemail', auth([UserState.admin, UserState.hr, UserState.student]), async (req: Request, res: Response) => {
-        const { email } = req.body;
-        const { userId } = req.user  as UserEntity;
-        const isEmail = await UserRecord.checkEmail(email);
+    .patch('/change-email', auth([UserState.admin, UserState.hr, UserState.student]), async (req: Request, res: Response) => {
+        const { email: newEmail, password } = req.body;
+        const { userId, email } = req.user  as UserEntity;
+        const isEmail = await UserRecord.checkEmail(newEmail);
 
         if(isEmail!==null){
             throw new ValidationError('emailExists')
         }
+        emailRegex(newEmail);
+        const user = new UserRecord({ email, password });
+        await user.checkPassword();
+        await UserRecord.updateEmail(userId, newEmail);
+        res.json({ status: true, message: 'emailChanged' });
+    })
+    .patch('/change-password', auth([UserState.admin, UserState.hr, UserState.student]), async (req: Request, res: Response) => {
+        const { password, confirmedPassword } = req.body;
+        const { userId } = req.user  as UserEntity;
+        passwordRegex(password);
+        comparePassword(password, confirmedPassword);
+        const user = new UserRecord({ userId,password });
 
-        if (!email.includes('@')) {
-            throw new ValidationError('invalidEmail');
-        }
-        await UserRecord.updateEmail(userId, email);
-        res.json(true);
-    });
+        await user.updatePassword();
+        res.json({ message: 'passwordChanged' }).status(200);
+    })
+;
