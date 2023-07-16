@@ -26,7 +26,6 @@ export class UserRecord implements  UserEntity {
     async insert():Promise<void>{
         this.password = '';
         this.authToken = null;
-        this.userState = 0;
 
         await pool('users').insert({
             userId: this.userId,
@@ -143,11 +142,10 @@ export class UserRecord implements  UserEntity {
         return newToken;
     }
 
-    async hashPassword(): Promise<string> {
+    async hashPassword(): Promise<void> {
         try {
             const salt = bcrypt.genSaltSync(10);
-            this.password = await bcrypt.hash(this.password, salt)
-            return this.password;
+            this.password = await bcrypt.hash(this.password, salt);
         }catch (e){
             throw new ValidationError('tryLater');
         }
@@ -155,8 +153,7 @@ export class UserRecord implements  UserEntity {
 
     async updatePassword(): Promise<void> {
         passwordRegex(this.password);
-        await this.hashPassword;
-
+        await this.hashPassword();
         await pool('users')
             .where('userId', this.userId)
             .update({ password: this.password });
@@ -169,7 +166,7 @@ export class UserRecord implements  UserEntity {
     }
 
     static async updateEmail(id: string, email: string): Promise<void> {
-        await pool('user')
+        await pool('users')
             .where('userId',id)
             .update({ email });
     }
