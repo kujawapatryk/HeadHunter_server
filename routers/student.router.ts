@@ -44,8 +44,6 @@ studentRouter
 
     .get('/get-cv/:studentId', auth([UserState.hr]), async (req, res) => {
         const { studentId }= req.params;
-        const { userId } = req.user as UserEntity;
-        await hrExists(userId);
         const data = await StudentRecord.getCvOneStudent(studentId);
         res.json(data);
     })
