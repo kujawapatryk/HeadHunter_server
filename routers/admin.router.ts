@@ -26,6 +26,7 @@ adminRouter
         const userData = {
             userId,
             email,
+            userState: UserState.hr,
         };
         const hrData = {
             hrId: userId,
