@@ -24,7 +24,7 @@ export const extraLoginData = async (id:string, state: number) => {
             .first() as StudentResult;
 
         return {
-            name: result.firstName + '' + result.lastName,
+            name: result.firstName + ' ' + result.lastName,
             githubUsername: result.githubUsername,
         };
 
