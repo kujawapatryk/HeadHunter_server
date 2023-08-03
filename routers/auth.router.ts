@@ -6,6 +6,7 @@ import { ValidationError } from '../utils/errors';
 import { auth } from '../auth/auth';
 import { UserEntity, UserState } from '../types';
 import { pool } from '../config/db';
+import { config } from '../config/config';
 
 export const authRouter = Router();
 
@@ -15,14 +16,14 @@ authRouter
     .post('/login', async (req: Request, res: Response) => {
         const params = new UserRecord(req.body);
         const result = await params.checkPassword();
-        console.log(params)
+
         if (result.id) {
 
             const token = createToken(await generateToken(result.id))
             const extraData = await extraLoginData(result.id,result.state)
 
             res.cookie('token', token,{
-                secure: false,
+                secure: config.cookieSecure,
                 domain: '127.0.0.1',
                 httpOnly: true,
             })
@@ -45,7 +46,7 @@ authRouter
             .where({ userId })
 
         res.clearCookie('token',{
-            secure: false,
+            secure: config.cookieSecure,
             domain: '127.0.0.1',
             httpOnly: true,
         })
