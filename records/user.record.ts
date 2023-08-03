@@ -1,29 +1,22 @@
 import { ValidationError } from '../utils/errors';
 import { RegistrationTokenEntity, UserEntity } from '../types';
-import { FieldPacket } from 'mysql2';
 import { pool } from '../config/db';
 import bcrypt from 'bcrypt';
 import { v4 as uuid } from 'uuid';
-
-type UserRecordResult = [UserRecord[], FieldPacket[]];
-type RegistrationTokenResult = [RegistrationTokenEntity[], FieldPacket[]];
+import { sendMail } from '../utils/sendMail';
+import { config } from '../config/config';
+import { emailRegex } from '../utils/validation/emailRegex';
+import { passwordRegex } from '../utils/validation/passwordRegex';
 
 export class UserRecord implements  UserEntity {
 
     userId?: string;
-    email: string;
+    email?: string;
     password?: string
     authToken?: string
     userState?: number
 
     constructor(obj: UserEntity) {
-        const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-        if (!obj.email) {
-            throw new ValidationError("Adres e-mail jest wymagany");
-        } else if (!regex.test(obj.email)) {
-            throw new ValidationError("To nie jest prawidłowy adres e-mail");
-        }
         this.userId = obj.userId;
         this.email = obj.email;
         this.password = obj.password;
@@ -31,125 +24,167 @@ export class UserRecord implements  UserEntity {
         this.userState = obj.userState;
     }
     async insert():Promise<void>{
-        this.password = null;
+        this.password = '';
         this.authToken = null;
-        this.userState = 0;
 
-        await pool.execute("INSERT INTO `users`(`userId`, `email`, `password`, `authToken`, `userState`) VALUES (:userId, :email, :password, :authToken, :userState)", this);
+        await pool('users').insert({
+            userId: this.userId,
+            email: this.email,
+            password: this.password,
+            authToken: this.authToken,
+            userState: this.userState
+        }).catch(() => {
+            throw new ValidationError('userAddFailed')
+        });
     }
 
-    async hashPassword(password: string, salt: string): Promise<string> {
-        try {
-            return await bcrypt.hash(password, salt);
-        } catch (err) {
-            throw new ValidationError("Coś poszło nie tak");
-        }
+    static async resetPassword(email:string){
+
+        emailRegex(email);
+
+        const result = await pool('users')
+            .select('userId')
+            .where({ email })
+            .first() as { userId:string }
+        if(result === undefined)
+            throw new ValidationError('invalidEmail');
+
+        const token = await UserRecord.addToken(result.userId);
+        await sendMail(email,'Zresetuj hasło Headhanter',`aby zresetować hasło wejdz na adress ${config.corsOrigin}/new-password/${token}/${result.userId} `);
+
     }
 
-    async newHashPassword(password: string) {
-        const salt = bcrypt.genSaltSync(10);
-        const hash = await this.hashPassword(password, salt)
-        return { password: hash, salt: salt }
-    }
+    static async getOne(email: string):Promise<UserRecord | null> {
 
-
-    checkPasswordStrength() {
-        const passwordRegex = /^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&*])(?=.{8,})/; // cyfra/mała litera/duża litera/znakspecjalny/min 8 znaków
-        return passwordRegex.test(this.password);
-    }
-
-    static async getOne(email: string): Promise<UserEntity | null> {
-        const [results] = await pool.execute("SELECT * FROM `users` WHERE `email`=:email", { email }) as UserRecordResult;
-        return results.length === 0 ? null : new UserRecord(results[0] as UserEntity)
+        const results = await pool('users')
+            .select('*')
+            .where('email', email)
+            .first() as UserEntity;
+        return results ? new UserRecord(results) : null;
 
     }
 
     async checkPassword() {
-        if (this.checkPasswordStrength()) {
-            const user: UserEntity | null = await UserRecord.getOne(this.email);
+        if (passwordRegex(this.password)) {
+            const user: UserRecord | null = await UserRecord.getOne(this.email);
+
             if (user === null) {
-                throw new ValidationError('Podany został nie prawidłowy adres e-mail')
+                throw new ValidationError('invalidEmail');
             }
+
             try {
-                return await bcrypt.compare(this.password, user.password);
+                if (await bcrypt.compare(this.password, user.password)){
+                    return {
+                        id: user.userId,
+                        state: user.userState
+                    }
+
+                }
             } catch (err) {
                 console.error(err.message);
-                throw new ValidationError("Wystąpił błąd przy próbie logowania");
+                throw new ValidationError('invalidCredentials');
             }
         } else {
-            throw new ValidationError("Hasło nie spełnia wymagań bezpieczeństwa.")
+            throw new ValidationError('passwordInsecure');
         }
     }
 
-    static async checkToken(token: string): Promise<string | null> {
-        const [results] = (await pool.execute("SELECT * FROM `registration_tokens` WHERE `registrationToken` = :token", {
-            token,
-        })) as RegistrationTokenResult;
-        if (results.length === 0) {
-            return('Błąd: brak tokena!');
-        }
-        return (results[0].tokenExpiresOn).getTime() < Date.now() ? null : results[0].userId;
+    static async checkToken(token: string, userId: string): Promise<true> {
+
+        const result = await pool('registration_tokens')
+            .select('userId')
+            .where('registrationToken',token)
+            .where({ userId })
+            .where('tokenExpiresOn', '>',new Date())
+            .first() as { userId: string }
+
+        if (result === undefined)
+            throw new ValidationError('tokenExpired')
+
+        return true
     }
 
     static async checkEmail(email: string): Promise<string | null> {
-        const [results] = (await pool.execute("SELECT `userId` FROM `users` WHERE `email` = :email", {
-            email,
-        })) as UserRecordResult;
-        return results.length === 0 ? null : results[0].userId;
+
+        const results = await pool('users')
+            .select('userId')
+            .where('email',email)
+            .first() as { userId:string }
+
+        return results === undefined ? null : results.userId;
     }
 
-    static async addToken(id: string): Promise<string> {
+    static async addToken(id: string): Promise<string> { // do
         let newToken, isThisToken;
         do {
             newToken = uuid();
-            const [results] = await pool.execute("SELECT `userId` FROM `registration_tokens` WHERE `registrationToken` = :token", {
-                token: newToken,
-            }) as UserRecordResult;
+            const results = await  pool('registration_tokens')
+                .select('userId')
+                .where('registrationToken',newToken) as UserRecord[];
+
             isThisToken = results.length;
         } while (isThisToken > 0)
-        const [results] = (await pool.execute("SELECT `userId` FROM `registration_tokens` WHERE `userId` = :userId", {
-            userId: id,
-        })) as RegistrationTokenResult;
+        const results = await pool('registration_tokens')
+            .select('userId')
+            .where('userId',id) as RegistrationTokenEntity[];
+
         if (results.length > 0) {
-            await pool.execute("DELETE FROM `registration_tokens` WHERE `userId` = :userId", {
-                userId: id,
-            });
+            await pool('registration_tokens')
+                .where('userId', id)
+                .del();
         }
-        await pool.execute("INSERT INTO `registration_tokens` (`userId`, `registrationToken`, `tokenExpiresOn`) VALUES (:userId, :token, ADDDATE(NOW(), INTERVAL 1 DAY))", {
-            userId: id,
-            token: newToken,
-        });
+        await pool('registration_tokens')
+            .insert({
+                userId: id,
+                registrationToken: newToken,
+                tokenExpiresOn: pool.raw('ADDDATE(NOW(), INTERVAL 1 DAY)'),
+            })
         return newToken;
     }
 
-    static async updatePassword(id: string, hashPassword: string): Promise<void> {
-        await pool.execute("UPDATE `users` SET `password` = :hashPassword WHERE `userId` = :id", {
-            hashPassword,
-            id,
-        });
-        await pool.execute("DELETE FROM `registration_tokens` WHERE `userId` = :id", {
-            id,
-        });
+    async hashPassword(): Promise<void> {
+        try {
+            const salt = bcrypt.genSaltSync(10);
+            this.password = await bcrypt.hash(this.password, salt);
+        }catch (e){
+            throw new ValidationError('tryLater');
+        }
     }
 
+    async updatePassword(): Promise<void> {
+        passwordRegex(this.password);
+        await this.hashPassword();
+        await pool('users')
+            .where('userId', this.userId)
+            .update({ password: this.password });
+    }
+
+    async deleteToken(){
+        await pool('registration_tokens')
+            .where('userId',this.userId)
+            .del();
+    }
 
     static async updateEmail(id: string, email: string): Promise<void> {
-        await pool.execute("UPDATE `users` SET `email` = :email WHERE `userId` = :id", {
-            email,
-            id,
-        });
+        await pool('users')
+            .where('userId',id)
+            .update({ email });
     }
-
 
     static async updateStudentStatus(studentId: string, userStatus: number): Promise<void> {
-        await pool.execute("UPDATE `students` SET `userStatus` = :userStatus WHERE `studentId` = :studentId", {
-            studentId,
-            userStatus,
-        });
+
+        await pool('students')
+            .where({ studentId })
+            .update({ userStatus })
     }
 
-    static async getEmail(id: string): Promise<string> {
-        const [results] = await pool.execute("SELECT `email` FROM `users` WHERE `userId`=:id", { id }) as UserRecordResult;
-        return results[0].email;
+    static async getEmail(token: string): Promise<any> {
+        const results = await  pool('users')
+            .select('*')
+            .where('authToken', token)
+            .first();
+        console.log(results);
+        return results === null ? null : results;
+
     }
 }

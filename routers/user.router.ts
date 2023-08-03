@@ -1,102 +1,72 @@
 import { Request, Response, Router } from 'express';
 import { UserRecord } from '../records/user.record';
 import { ValidationError } from '../utils/errors';
-import { hash } from 'bcrypt';
-import jwt from 'jsonwebtoken';
-import { UserEntity } from '../types';
+import { comparePassword } from '../utils/validation/comparePassword';
+import { auth } from '../auth/auth';
+import { UpdateAction, UserEntity, UserState } from '../types';
+import { emailRegex } from '../utils/validation/emailRegex';
+import { passwordRegex } from '../utils/validation/passwordRegex';
+import { StudentRecord } from '../records/student.record';
 
 export const userRouter = Router();
 
 userRouter
 
-    .post('/login', async (req: Request, res: Response) => {
-        const params = { ...req.body } as UserEntity;
-        const newParams = new UserRecord(params);
-        if (await newParams.checkPassword()) {
-            console.log('Dane logowania są prawidłowe');
-            const token = jwt.sign({ email: newParams.email }, /* @todo SET SECRET KEY process.env.secret_key*/'SEKRET', { expiresIn: '24h' });
-            res.json({ token });
-        } else {
-            throw new ValidationError('Błędne hasło')
-        }
-
-    })
-    .post("/refresh", async (req, res) => {
-        // refresh jwt
+    .patch('/my-status',auth([UserState.student]), async (req, res) => {
+        const { userId } = req.user as UserEntity;
+        const message = await StudentRecord.statusChange(UpdateAction.employ, userId);
+        res.json({ status: true, message });
     })
 
-    
-    .delete("/logout", async (req, res) => {
-        // czyszczenie tokenów i wylogowanie
+    .get('/check-token/:userId/:token', async (req, res) => {
+        const { userId,token } = req.params;
+        await UserRecord.checkToken(token, userId);
+        res.status(200).json({ status: 'ok' });
     })
 
-    .get('/about-me', async (req, res) => {
-        // id użytkownika przekazane w tokenie wymaga id użytkownika i zwraca wszystkie
-        // dane wymagane do wyświetlenia danych kursanta do edycji ich pobiera status
-        // kursanta i ewentualnych rezerwacjach od hr-u (nie jest wymagane)
+    .get('/reset/:email', async (req,res) =>{
+        const email = req.params.email;
+        await UserRecord.resetPassword(email);
+        res.json({ status: 'ok', message:'emailResetSent' }).status(200);
     })
 
-    .post('/about-me', async (req, res) => {
-        const userId = req.body
+    //@TODO sprawdzić, brak autoryzacji, link z maila
+    .patch('/new-password', async (req, res) =>{
+        const { token, password, confirmedPassword } = req.body;
+        const { userId } = req.user  as UserEntity;
+        await UserRecord.checkToken(token, userId);
 
-        // przyjmuje formularz dodania/edycji danych i na jego podstawie wprowadza
-        // zmiany w bazie
+        comparePassword(password,confirmedPassword);
+
+        const user = new UserRecord({ userId,password });
+        await user.updatePassword();
+        await user.deleteToken();
+        res.json({ message: 'passwordSuccessfullyChanged' }).status(200);
+
     })
 
-    .post('/my-status', async (req, res) => {
-        const {studentId, userStatus} = req.body;
-        await UserRecord.updateStudentStatus(studentId, userStatus);
-        res.json(true);
-        // przyjmuje dane o statusie (zatrudniony lub nie)  i  wprowadza zmiany w bazie
-    })
-
-    .get("/token/:token", async (req: Request, res: Response) => {
-        const userId: string | null = await UserRecord.checkToken(req.params.token);
-        res.json(userId);
-    })
-
-    .get("/getemail/:id", async (req: Request, res: Response) => {
-        const userEmail: string = await UserRecord.getEmail(req.params.id);
-        res.json(userEmail);
-    })
-
-    .get("/email/:email", async (req: Request, res: Response) => {
-        const userId: string | null = await UserRecord.checkEmail(req.params.email);
-        if (userId === null) {
-            throw new ValidationError('Nie ma takiego adresu e-mail');
-        }
-        await UserRecord.addToken(userId);
-        res.json(req.params.email);
-    })
-
-    .patch('/newpass', async (req: Request, res: Response) => {
-        const { id, pass, pass2 } = req.body;
-
-        const passwordRegex = /^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&*])(?=.{8,})/;
-
-        if (!passwordRegex.test(pass)) {
-            throw new ValidationError('Hasło musi mieć co najmniej 8 znaków, składać się z dużych i małych liter, cyfr i znaków specjalnych');
-        }
-        if (pass !== pass2) {
-            throw new ValidationError('Hasła są różne');
-        }
-        const hashPassword = await hash(pass, 10);
-        await UserRecord.updatePassword(id, hashPassword);
-        res.json(true);
-    })
-
-    .patch("/changemail", async (req: Request, res: Response) => {
-        const {id, email} = req.body;
-        const isEmail = await UserRecord.checkEmail(email);
+    .patch('/change-email', auth([UserState.admin, UserState.hr, UserState.student]), async (req: Request, res: Response) => {
+        const { email: newEmail, password } = req.body;
+        const { userId, email } = req.user  as UserEntity;
+        const isEmail = await UserRecord.checkEmail(newEmail);
 
         if(isEmail!==null){
-            throw new ValidationError("Taki e-mail już istnieje w systemie")
+            throw new ValidationError('emailExists')
         }
+        emailRegex(newEmail);
+        const user = new UserRecord({ email, password });
+        await user.checkPassword();
+        await UserRecord.updateEmail(userId, newEmail);
+        res.json({ status: true, message: 'emailChanged' });
+    })
+    .patch('/change-password', auth([UserState.admin, UserState.hr, UserState.student]), async (req: Request, res: Response) => {
+        const { password, confirmedPassword } = req.body;
+        const { userId } = req.user  as UserEntity;
+        passwordRegex(password);
+        comparePassword(password, confirmedPassword);
+        const user = new UserRecord({ userId,password });
 
-        if (!email.includes('@')) {
-            throw new ValidationError('To nie jest poprawny adres e-mail');
-        }
-        await UserRecord.updateEmail(id, email);
-        res.json(true);
-    });
-
+        await user.updatePassword();
+        res.json({ message: 'passwordChanged' }).status(200);
+    })
+;

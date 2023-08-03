@@ -25,21 +25,18 @@ export interface ReservedStudent extends AvailableStudent {
 }
 
 export interface StudentEntity extends ReservedStudent{
-  phoneNumber: string | null;
-  portfolioUrls: string | null;
+  phoneNumber: string;
+  portfolioUrls: string;
   projectUrls:string;
-  bio:string | null;
-  education:string | null;
-  workExperience:string | null;
-  courses:	string | null;
+  bio:string;
+  education:string;
+  workExperience:string;
+  courses:	string;
   userStatus: string;
-  bonusProjectUrls:string | null;
+  bonusProjectUrls:string;
   reservedBy:string | null;
 }
-
 
 export interface SingleStudent extends Omit<StudentEntity, 'reservationExpiresOn' | 'reservedBy' | 'userStatus'> {
   email: string;
 }
-
-
