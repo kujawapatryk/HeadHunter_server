@@ -28,9 +28,10 @@ app.use('/student', studentRouter);
 app.use('/hr', hrRouter);
 app.use('/manage', adminRouter);
 app.use('/', homeRouter);
-app.use('/auth', authRouter)
+app.use('/auth', authRouter);
 app.use(handleError);
 
 app.listen(3001, '127.0.0.1', () => {
     console.log('Listening on http://127.0.0.1:3001');
+
 });
