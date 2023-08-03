@@ -3,19 +3,19 @@ import { UserRecord } from '../records/user.record';
 import { ValidationError } from '../utils/errors';
 import { comparePassword } from '../utils/validation/comparePassword';
 import { auth } from '../auth/auth';
-import { UserEntity, UserState } from '../types';
+import { UpdateAction, UserEntity, UserState } from '../types';
 import { emailRegex } from '../utils/validation/emailRegex';
 import { passwordRegex } from '../utils/validation/passwordRegex';
+import { StudentRecord } from '../records/student.record';
 
 export const userRouter = Router();
 
 userRouter
 
-    .post('/my-status', async (req, res) => {
-        const { studentId, userStatus } = req.body;
-        await UserRecord.updateStudentStatus(studentId, userStatus);
-        res.json(true);
-        // przyjmuje dane o statusie (zatrudniony lub nie)  i  wprowadza zmiany w bazie
+    .patch('/my-status',auth([UserState.student]), async (req, res) => {
+        const { userId } = req.user as UserEntity;
+        const message = await StudentRecord.statusChange(UpdateAction.employ, userId);
+        res.json({ status: true, message });
     })
 
     .get('/check-token/:userId/:token', async (req, res) => {
@@ -31,7 +31,7 @@ userRouter
     })
 
     //@TODO sprawdzić, brak autoryzacji, link z maila
-    .patch('/new-password', auth([UserState.admin, UserState.hr, UserState.student]), async (req, res) =>{
+    .patch('/new-password', async (req, res) =>{
         const { token, password, confirmedPassword } = req.body;
         const { userId } = req.user  as UserEntity;
         await UserRecord.checkToken(token, userId);
