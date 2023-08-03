@@ -184,9 +184,9 @@ export class StudentRecord implements StudentEntity {
       return results;
   }
 
-  static async statusChange(action:UpdateAction, studentId:string, hrId:string):Promise<string> {
+  static async statusChange(action:UpdateAction, studentId:string, hrId?:string):Promise<string> {
 
-      let userStatus=0;
+      let userStatus;
       let reservationExpiresOn:null|Date;
       let message='';
 
