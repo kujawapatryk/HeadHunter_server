@@ -5,6 +5,8 @@ import bcrypt from 'bcrypt';
 import { v4 as uuid } from 'uuid';
 import { sendMail } from '../utils/sendMail';
 import { config } from '../config/config';
+import { emailRegex } from '../utils/validation/emailRegex';
+import { passwordRegex } from '../utils/validation/passwordRegex';
 
 export class UserRecord implements  UserEntity {
 
@@ -15,13 +17,6 @@ export class UserRecord implements  UserEntity {
     userState?: number
 
     constructor(obj: UserEntity) {
-    //    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-        // if (!obj.email) {
-        //     throw new ValidationError('emailRequired');
-        // } else if (!regex.test(obj.email)) {
-        //     throw new ValidationError('invalidEmail');
-        // }
         this.userId = obj.userId;
         this.email = obj.email;
         this.password = obj.password;
@@ -31,7 +26,6 @@ export class UserRecord implements  UserEntity {
     async insert():Promise<void>{
         this.password = '';
         this.authToken = null;
-        this.userState = 0;
 
         await pool('users').insert({
             userId: this.userId,
@@ -44,18 +38,9 @@ export class UserRecord implements  UserEntity {
         });
     }
 
-    // async hashPassword(password: string, salt: string): Promise<string> {
-    //     try {
-    //         return await bcrypt.hash(password, salt);
-    //     } catch (err) {
-    //         throw new ValidationError('tryLater');
-    //     }
-    // }
-
     static async resetPassword(email:string){
-        const regexEmail = /^\S+@\S+\.\S+$/;
-        if(!regexEmail.test(email))
-            throw new ValidationError('invalidEmail');
+
+        emailRegex(email);
 
         const result = await pool('users')
             .select('userId')
@@ -69,13 +54,6 @@ export class UserRecord implements  UserEntity {
 
     }
 
-    checkPasswordStrength(): boolean {
-        const passwordRegex = /^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&*])(?=.{8,})/; // cyfra/mała litera/duża litera/znakspecjalny/min 8 znaków
-        if(!passwordRegex.test(this.password))
-            throw new ValidationError('invalidPasswordFormat');
-        return true
-    }
-
     static async getOne(email: string):Promise<UserRecord | null> {
 
         const results = await pool('users')
@@ -87,11 +65,13 @@ export class UserRecord implements  UserEntity {
     }
 
     async checkPassword() {
-        if (this.checkPasswordStrength()) {
+        if (passwordRegex(this.password)) {
             const user: UserRecord | null = await UserRecord.getOne(this.email);
+
             if (user === null) {
                 throw new ValidationError('invalidEmail');
             }
+
             try {
                 if (await bcrypt.compare(this.password, user.password)){
                     return {
@@ -102,10 +82,10 @@ export class UserRecord implements  UserEntity {
                 }
             } catch (err) {
                 console.error(err.message);
-                throw new ValidationError('tryLater');
+                throw new ValidationError('invalidCredentials');
             }
         } else {
-            throw new ValidationError('passwordInsecure')
+            throw new ValidationError('passwordInsecure');
         }
     }
 
@@ -134,7 +114,7 @@ export class UserRecord implements  UserEntity {
         return results === undefined ? null : results.userId;
     }
 
-    static async addToken(id: string): Promise<string> {
+    static async addToken(id: string): Promise<string> { // do
         let newToken, isThisToken;
         do {
             newToken = uuid();
@@ -165,16 +145,15 @@ export class UserRecord implements  UserEntity {
     async hashPassword(): Promise<void> {
         try {
             const salt = bcrypt.genSaltSync(10);
-            this.password = await bcrypt.hash(this.password, salt)
+            this.password = await bcrypt.hash(this.password, salt);
         }catch (e){
             throw new ValidationError('tryLater');
         }
     }
 
     async updatePassword(): Promise<void> {
-        this.checkPasswordStrength();
-        await this.hashPassword;
-
+        passwordRegex(this.password);
+        await this.hashPassword();
         await pool('users')
             .where('userId', this.userId)
             .update({ password: this.password });
@@ -187,7 +166,7 @@ export class UserRecord implements  UserEntity {
     }
 
     static async updateEmail(id: string, email: string): Promise<void> {
-        await pool('user')
+        await pool('users')
             .where('userId',id)
             .update({ email });
     }
@@ -199,13 +178,13 @@ export class UserRecord implements  UserEntity {
             .update({ userStatus })
     }
 
-    static async getEmail(userId: string): Promise<string> {
+    static async getEmail(token: string): Promise<any> {
         const results = await  pool('users')
-            .select('email')
-            .where({ userId })
-            .first() as { email: string };
-
-        return results === null ? null : results.email;
+            .select('*')
+            .where('authToken', token)
+            .first();
+        console.log(results);
+        return results === null ? null : results;
 
     }
 }

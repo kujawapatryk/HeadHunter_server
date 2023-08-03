@@ -22,13 +22,13 @@ const checkGitHub = async (userName: string): Promise<string | null> => {
     }
 }
 
-const checkGithubUsername = async (githubUsername: string): Promise<string | null> => {
-    const results = await pool('students')
+const checkGithubUsername = async (githubUsername: string, studentId:string): Promise<string | null> => {
+    const result = await pool('students')
         .select('studentId')
         .where({ githubUsername })
         .first() as { studentId : string };
 
-    return results === null ? null : results.studentId;
+    return result === null ? null : result.studentId=== studentId ? null : result.studentId;
 }
 
 export class StudentRecord implements StudentEntity {
@@ -63,7 +63,7 @@ export class StudentRecord implements StudentEntity {
 
       if(!obj.studentId){
 
-          if ((checkGithubUsername(this.githubUsername) !== null)&&(this.githubUsername!=='')) {
+          if ((checkGithubUsername(this.githubUsername, this.studentId) !== null)&&(this.githubUsername!=='')) {
             
               throw new ValidationError('Taki użytkownik GitHuba już istnieje');
           }
@@ -184,9 +184,9 @@ export class StudentRecord implements StudentEntity {
       return results;
   }
 
-  static async statusChange(action:UpdateAction, studentId:string, hrId:string):Promise<string> {
+  static async statusChange(action:UpdateAction, studentId:string, hrId?:string):Promise<string> {
 
-      let userStatus=0;
+      let userStatus;
       let reservationExpiresOn:null|Date;
       let message='';
 
